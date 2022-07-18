@@ -5,15 +5,124 @@ import { useMemo, useState, useCallback, useEffect } from "react";
 const SkuSelector = (props) => {
   const { specs, skus, value, onConfirm } = props;
 
-  const onConfirmHandler = () => {};
+  const [disabledOptions, setDisabledOptions] = useState(new Set([]));
 
+  const [selectedOptions, setSelectedOptions] = useState(new Set([]));
+
+  const [selectedSkuId, setSelectedSkuId] = useState(value);
+
+  const selectedSku = useMemo(() => {
+    return skus.find((i) => i.skuId === selectedSkuId);
+  }, [skus, selectedSkuId]);
+
+  // 根据 specs optionId 反查 skuId
+  const optionIdsToSpecIdMap = useMemo(() => {
+    const map = new Map([]);
+    skus.forEach((s) => {
+      map.set(s.specOptionIds.sort().join(","), s.skuId);
+    });
+    return map;
+  }, [skus]);
+
+  // step 1: generate graph
   const graph = useMemo(() => {
+    console.log("step 1: generate graph; useMemo;");
     const skuMatrix = skus.map((s) => s.specOptionIds);
     const specsMatrix = specs.map((s) => s.options.map((o) => o.optionId));
     const g = new Graph([...skuMatrix, ...specsMatrix]);
     g.generateNonEdge();
     return g;
   }, [specs, skus]);
+
+  // step 2: generate selectedNodes, disabledNodes when init
+  useEffect(() => {
+    const defaultSku = skus.find((i) => i.skuId === value);
+    const selectedOptions = new Set(defaultSku?.specOptionIds || []);
+    const disabledOptions = new Set(
+      [...selectedOptions]
+        .map((i) => [...graph.nonEdges.get(i)])
+        .reduce((a, b) => [...a, ...b], [])
+    );
+    console.log(
+      "step 2: generate default - useEffect; selectedOptions, disabledOptions",
+      selectedOptions,
+      disabledOptions
+    );
+
+    setSelectedOptions(selectedOptions);
+    setDisabledOptions(disabledOptions);
+  }, [skus, value, graph.nonEdges]);
+
+  // step 3. generate selected sku
+  useEffect(() => {
+    // 选择完成
+    console.log("step 3: generate selected sku id; useEffect;");
+    if (specs.length === selectedOptions.size) {
+      const key = [...selectedOptions].sort().join(",");
+      const selectedSkuId = optionIdsToSpecIdMap.get(key);
+      console.log(
+        "optionIdsToSpecIdMap",
+        optionIdsToSpecIdMap,
+        "key",
+        key,
+        "selectedSkuId",
+        selectedSkuId
+      );
+      setSelectedSkuId(selectedSkuId);
+    } else {
+      setSelectedSkuId(value);
+    }
+  }, [specs, skus, value, selectedOptions, optionIdsToSpecIdMap]);
+
+  // step 3.1: generate view model - specsViewModel
+
+  const specsViewModel = useMemo(() => {
+    const specsVM = specs.map((s) => ({
+      ...s,
+      options: s.options.map((o) => ({
+        ...o,
+        isSelected: selectedOptions.has(o.optionId),
+        isDisabled: disabledOptions.has(o.optionId),
+      })),
+    }));
+    console.log("step 3.1 generate specsViewModel; useMemo;");
+    return specsVM;
+  }, [specs, disabledOptions, selectedOptions]);
+
+  // step 3.2: generate view model - selectedSkuViewModel
+
+  const selectedSkuViewModel = useMemo(() => {
+    console.log("step 3.2 generate selectedSkuViewModel; useMemo;");
+
+    console.log("- selectedSkuViewModel - selectedSku", selectedSku);
+    const vm = {
+      ...selectedSku,
+      stockText: "",
+      specsText: "",
+    };
+
+    if (selectedOptions.size === specs.length) {
+      vm.stockText = `库存：${selectedSku.stock}`;
+      vm.specsText = `已选：${selectedSku.specOptionDesc.join("/")}`;
+    } else if (selectedOptions.size >= 0) {
+      const totalStockNum = skus.map((i) => i.stock).reduce((x, y) => x + y, 0);
+      vm.stockText = `库存：${totalStockNum}`;
+
+      if (selectedOptions.size === 0) {
+        const text = specs.map((s) => s.label).join("/");
+        vm.specsText = `请选择：${text}`;
+      } else {
+        const text = specs
+          .map((s) => s.options)
+          .reduce((x, y) => [...x, ...y], [])
+          .filter((o) => selectedOptions.has(o.optionId))
+          .map((i) => i.label)
+          .join("/");
+        vm.specsText = `已选：${text}`;
+      }
+    }
+    return vm;
+  }, [selectedSku, skus, specs, selectedOptions]);
 
   const specMap = useMemo(() => {
     const map = new Map();
@@ -27,10 +136,6 @@ const SkuSelector = (props) => {
     return map;
   }, [specs]);
 
-  const [disabledOptions, setDisabledOptions] = useState(new Set([]));
-
-  const [selectedOptions, setSelectedOptions] = useState(new Set([]));
-
   const getSelectedSiblingOptionId = useCallback(
     (optionId, specId) => {
       return [...specMap.get(specId)].find(
@@ -40,53 +145,12 @@ const SkuSelector = (props) => {
     [specMap, selectedOptions]
   );
 
-  const [selectedSku, setSelectedSku] = useState({});
-
-  useEffect(() => {
-    const defaultSku = skus.find((i) => i.id === value);
-    const selectedOptions = new Set(defaultSku?.specOptionIds || []);
-    const disabledOptions = new Set(
-      [...selectedOptions]
-        .map((i) => [...graph.nonEdges.get(i)])
-        .reduce((a, b) => [...a, ...b], [])
-    );
-    console.log(
-      "useEffect- selectedOptions, disabledOptions",
-      defaultSku,
-      selectedOptions,
-      disabledOptions
-    );
-    setSelectedOptions(selectedOptions);
-    setDisabledOptions(disabledOptions);
-  }, [value, skus, graph.nonEdges]);
-
-  useEffect(()=> {
-    let selected = skus.find(x => x.specOptionIds.sort().join(',') === [...selectedOptions].sort().join(','));
-   
-    setSelectedSku(selected);
-  },[skus,value, selectedOptions])
-
-
-
-  const specsViewModel = useMemo(() => {
-    const viewModel = specs.map((s) => ({
-      ...s,
-      options: s.options.map((o) => ({
-        ...o,
-        isSelected: selectedOptions.has(o.optionId),
-        isDisabled: disabledOptions.has(o.optionId)
-      }))
-    }));
-    return viewModel;
-  }, [specs, disabledOptions, selectedOptions]);
-
   const onTapOptionHandler = useCallback(
     (event, optionId, specId) => {
       if (disabledOptions.has(optionId)) return;
 
       const toBeReplacedOptionId = getSelectedSiblingOptionId(optionId, specId);
 
-      
       if (toBeReplacedOptionId) {
         console.log(" onTapOptionHandler - replace");
 
@@ -124,25 +188,30 @@ const SkuSelector = (props) => {
       selectedOptions,
       disabledOptions,
       getSelectedSiblingOptionId,
-      graph.nonEdges
+      graph.nonEdges,
     ]
   );
 
   return (
     <div className="sku-container">
       <div className="sku-info">
-        <div className="sku-info__image">图片</div>
+        <div className="sku-info__image">
+          {selectedSkuViewModel.specOptionDesc.join(",")}
+        </div>
         <div className="sku-info__detail">
-          <div className="sku-info__price1"></div>
-          <div className="sku-info__price2"></div>
-          <div className="sku-info__stock">库存：{selectedSku?.stock}</div>
+          <div className="sku-info__price1">
+            {selectedSkuViewModel.priceLabel}:{selectedSkuViewModel.price}
+          </div>
+          <div className="sku-info__price2">{selectedSkuViewModel.subPriceLabel}:{selectedSkuViewModel.subPrice}</div>
+          <div className="sku-info__stock">
+            {selectedSkuViewModel.stockText}
+          </div>
 
           <div className="sku-info__stock">
-            已选：{selectedSku?.specOptionDesc?.join("/")}
+            {selectedSkuViewModel.specsText}
           </div>
         </div>
       </div>
-
       <div className="spec-container">
         {specsViewModel.map((specItem) => {
           return (
@@ -166,7 +235,7 @@ const SkuSelector = (props) => {
                         )
                       }
                     >
-                      ({specOption.optionId}){specOption.label}
+                      {specOption.label}
                     </div>
                   );
                 })}

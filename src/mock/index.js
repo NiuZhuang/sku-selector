@@ -29,7 +29,7 @@ export const mockSkuData = {
     ],
     skus: [
       {
-        id: 1,
+        skuId: 1,
         specOptionDesc: ["紫色", "套餐一", "64G"],
         specOptionIds: [2, 3, 5],
         price: 10,
@@ -40,7 +40,7 @@ export const mockSkuData = {
         imageUrl: ""
       },
       {
-        id: 2,
+        skuId: 2,
         specOptionDesc: ["紫色", "套餐一", "128G"],
         specOptionIds: [2, 3, 6],
         price: 10,
@@ -51,7 +51,7 @@ export const mockSkuData = {
         imageUrl: ""
       },
       {
-        id: 3,
+        skuId: 3,
         specOptionDesc: ["紫色", "套餐二", "128G"],
         specOptionIds: [2, 4, 6],
         price: 10,
@@ -62,7 +62,7 @@ export const mockSkuData = {
         imageUrl: ""
       },
       {
-        id: 4,
+        skuId: 4,
         specOptionDesc: ["红色", "套餐二", "256G"],
         specOptionIds: [1, 4, 7],
         price: 10,
@@ -73,7 +73,7 @@ export const mockSkuData = {
         imageUrl: ""
       },
       {
-        id: 5,
+        skuId: 5,
         specOptionDesc: ["红色", "套餐二", "128G"],
         specOptionIds: [1, 4, 6],
         price: 10,
